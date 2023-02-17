@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/widgets.css">
+
+  <script>
+    /** @global inherits env from caller
+     *  @borrows API_SERVER
+     *  @borrows METADATA_ENDPOINT
+     */
+    window.env = window.parent.env || window.opener.env;
+  </script>
+</head>
+
+<body class="widget">
+  <div id="form-container" class="content-container">
+    <form id="form" class="content-container">
+      <label>
+        <span class="label-title">id</span>
+        <input type="text" name="id" placeholder="(required)">
+      </label>
+
+      <label>
+        <span class="label-title">
+          type
+          <select name="type-select" style="width:initial">
+            <option value="" disabled selected></option>
+            <option value="webpage">webpage</option>
+            <option value="article">article</option>
+            <option value="report">report</option>
+            <option value="post">post</option>
+            <option value="collection">collection</option>
+            <option value="book">book</option>
+          </select>
+        </span>
+        <input type="text" name="type" placeholder="(required)">
+      </label>
+      <div id="book-fields" hidden>
+        <label>
+          <input type="text" name="booktitle" placeholder="booktitle">
+        </label>
+        <label>
+          <input type="text" name="edition" placeholder="edition">
+        </label>
+      </div>
+      <label>
+        <input type="checkbox" name="online" checked> online
+      </label>
+
+      <label>
+        <span class="label-title">url</span>
+        <input type="text" name="url">
+      </label>
+      <label>
+        <span class="label-title">title</span>
+        <input type="text" name="title">
+      </label>
+      <label>
+        <span class="label-title">author</span>
+        <input type="text" name="author" placeholder="comma-separated list">
+      </label>
+      <label>
+        <span class="label-title">keywords</span>
+        <input type="text" name="keywords" placeholder="comma-separated list">
+      </label>
+      <label>
+        <span class="label-title">publisher</span>
+        <input type="text" name="publisher">
+      </label>
+      <label>
+        <span class="label-title">issued</span>
+        <input id="issued" name="issued" type="text">
+      </label>
+      <hr>
+      <label>
+        <span class="label-title">
+          <input id="accessedStatus" type="checkbox">
+          accessed
+        </span>
+        <input id="accessed" name="accessed" type="date">
+      </label>
+    </form>
+  </div>
+
+  <form id="buttons" class="buttons-container">
+    <input type="button" name="reset" value="reset">
+    <input type="button" name="metadata" value="metadata">
+    <input type="button" name="submit" value="toTextEditor">
+  </form>
+
+  <script type="module">
+    import Widget from './VisualEditorWidget.mjs';
+    const visualeditor = new Widget(form);
+
+    // event handlers
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.ctrlKey) {
+        buttons.submit.dispatchEvent(new PointerEvent('click'))
+      }
+    })
+
+    form.accessedStatus.addEventListener('change', () => {
+      form.accessed.disabled = !form.accessedStatus.checked;
+    });
+
+    // show/hide book fields
+    const bookFields = document.getElementById('book-fields');
+
+    form.type.addEventListener('change', (event) => {
+      if (form.type.value === 'book') {
+        bookFields.hidden = false;
+        form.online.checked = false;
+      } else {
+        if (['webpage', 'post'].includes(form.type.value)) form.online.checked = true;
+
+        bookFields.querySelectorAll('input').forEach(input => input.value = '')
+        bookFields.hidden = true;
+      }
+    });
+
+    form['type-select'].addEventListener('change', (event) => {
+      form.type.value = event.target.value;
+      form.type.focus();
+
+      form.type.dispatchEvent(new Event('change'));
+      form['type-select'].value = '';
+    });
+
+    // button handlers
+    buttons.reset.addEventListener('click', () => {
+      form.reset();
+    })
+
+    buttons.submit.addEventListener('click', () => {
+      window.parent.postMessage({
+        signal: 'toTextEditor',
+        message: visualeditor.generateObj(),
+      });
+    });
+
+    buttons.metadata.addEventListener('click', async () => {
+      const endpoint = env.API_SERVER + env.METADATA_ENDPOINT;
+      const metadata = await visualeditor.fetchMetadata(endpoint, form.url.value);
+
+      visualeditor.populateForm(metadata);
+      window.parent.postMessage({
+        signal: 'toTextEditor', message: metadata
+      })
+    })
+
+    // message handler
+    window.addEventListener('message', (event) => {
+      if (event.data.signal === 'reset') {
+        form.reset();
+      } else if (event.data.signal === 'populate') {
+        form.reset();
+
+        queueMicrotask(() => visualeditor.populateForm(event.data.message));
+        // run after reset completes
+      }
+    });
+  </script>
+
+</body>
+
+</html>

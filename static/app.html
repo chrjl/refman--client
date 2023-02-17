@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/frames.css">
+  <link rel="stylesheet" href="/styles/styles.css">
+
+  <meta property="API_SERVER" value="/api">
+  <meta property="ENTRIES_ENDPOINT" value="/entries">
+  <meta property="JSON_DUMP_ENDPOINT" value="/entries/DUMP">
+  <meta property="METADATA_ENDPOINT" value="/metadata">
+  <meta property="ARCHIVE_ENDPOINT" value="/archives/generate">
+  <meta property="BIBLATEX_ENDPOINT" value="/archives/generate-biblatex">
+
+  <script>
+    const getEnvFromMeta = function () {
+      const properties = document.head.querySelectorAll('meta[property]');
+
+      return [...properties].reduce((obj, elem) => ({
+        ...obj,
+        [elem.getAttribute('property')]: elem.getAttribute('value'),
+      }), {});
+    }
+
+    window.env = getEnvFromMeta();
+  </script>
+</head>
+
+<body>
+  <h1>welcome</h1>
+
+  <div id="collection" class="widgets-container">
+    <iframe id="selector" name="selector" src="/widgets/selector/selector.html"></iframe>
+    <iframe id="visualeditor" name="visualeditor" src="/widgets/visualeditor/visualeditor.html"></iframe>
+    <iframe id="texteditor" name="texteditor" src="/widgets/texteditor/texteditor.html"></iframe>
+
+    <form id="buttons">
+      <fieldset>
+        <legend>downloads</legend>
+
+        <input type="button" name="download-json" value="json">
+        <input type="button" name="download-archive" value="archive">
+        <input type="button" name="download-biblatex" value="BibLaTeX">
+      </fieldset>
+
+      <fieldset>
+        <legend>displays</legend>
+        <input type="button" name="html-table" value="HTML table">
+      </fieldset>
+    </form>
+  </div>
+</body>
+
+<script type="module">
+  const router = {  // route received messages, by event.data.signal
+    refreshSelector: {
+      dest: window.frames.selector,
+      signal: 'refresh',
+    },
+    clearTextEditor: {
+      dest: window.frames.texteditor,
+      signal: 'clear',
+    },
+    toTextEditor: {
+      dest: window.frames.texteditor,
+      signal: 'display',
+    },
+    resetVisualEditor: {
+      dest: window.frames.visualeditor,
+      signal: 'reset',
+    },
+    toVisualEditor: {
+      dest: window.frames.visualeditor,
+      signal: 'populate',
+    }
+  }
+
+  window.addEventListener('message', event => {
+    const { dest, signal } = router[event.data.signal];
+    dest.postMessage({ signal, message: event.data.message });
+  });
+
+  // button handlers
+  import handlers from '/scripts/handlers.js'
+
+  buttons['html-table'].addEventListener('click', () => {
+    window.open('/views/table-view.html')
+  })
+
+  buttons['download-archive'].addEventListener('click', async () => {
+    const response = await fetch(env.API_SERVER + env.ARCHIVE_ENDPOINT);
+    const filetype = response.headers.get('content-type');
+    const blob = await response.blob();
+
+    handlers.download({
+      blob,
+      basename: `db_${new Date().toISOString()}`,
+      extname: '.tgz'
+    })
+  });
+
+  buttons['download-json'].addEventListener('click', async () => {
+    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
+    const filetype = response.headers.get('content-type');
+    const blob = await response.blob();
+
+    handlers.download({
+      blob,
+      basename: `db_${new Date().toISOString()}`,
+      extname: '.json'
+    })
+
+  });
+
+  buttons['download-biblatex'].addEventListener('click', async () => {
+    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
+    const filetype = response.headers.get('content-type');
+    const model = await response.json();
+
+    // const { default: generateBib } = await import('/scripts/generate-biblatex.js');
+    const blob = new Blob([handlers.generateBib(model)], { type: 'text/x-bibtex' })
+
+    handlers.download({
+      blob,
+      basename: `db_${new Date().toISOString()}`,
+      extname: '.bib'
+    })
+  });
+</script>
+
+</html>

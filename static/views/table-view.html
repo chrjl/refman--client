@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/styles.css">
+  <script>
+    window.env = window.opener.env;
+
+  </script>
+
+  <script type="module">
+    const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
+
+    const response = await fetch(endpoint);
+    if (response.status >= 400) throw new Error(`${response.status} ${response.message}`);
+
+    const data = await response.json();
+
+    const trFrom = function (cells) {
+      const tr = document.createElement('tr');
+
+      cells.forEach(cell => {
+        const td = document.createElement('td');
+        td.innerHTML = cell.html;
+
+        tr.append(td);
+      })
+
+      return tr;
+    }
+
+    data.forEach(entry => {
+      entry.elem = trFrom([
+        { html: `<a href=${entry.url}>${entry.id}</a>` },
+        { html: `${entry.booktitle || entry.title}` },
+        { html: `${entry.keywords?.join(', ') || ''}` },
+        { html: `${entry.accessed || ''}` },
+      ])
+
+      table.append(entry.elem);
+    })
+
+    // generate download link, button
+    const downloadButton = document.getElementById('download-button')
+
+    downloadButton.addEventListener('click', () => {
+      const blob = new Blob([document.body.outerHTML]);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `tableview_${new Date().toISOString()}.html`;
+
+      if (confirm(`Download ${link.download} ?`)) {
+        link.click()
+      }
+
+      link.remove();
+    })
+  </script>
+</head>
+
+<body>
+  <style>
+    table {
+      border-collapse: collapse;
+      margin: 1rem, auto;
+    }
+
+    table th,
+    table td {
+      border-top-style: solid;
+      border-bottom-style: solid;
+      border-width: 1px;
+
+      padding: 0.5rem 0.25rem;
+    }
+
+    table th {
+      border-bottom-width: 2px;
+    }
+
+    .checkboxes {
+      border: solid 2px;
+      position: fixed;
+      left: 0;
+      top: 0;
+
+      background-color: white;
+      padding: 0.5rem;
+      list-style-type: none;
+      margin: 0;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+
+  <h1>Table view</h1>
+
+  <input id="download-button" type="button" value="download table">
+  <input id="close-button" type="button" value="close" onclick="window.close()">
+  <table id="table">
+    <thead>
+      <tr>
+        <th data-type="string">id</th>
+        <th data-type="string">title</th>
+        <th data-type="array">
+          keywords
+          <input id="keywords-controller" type="button" value="&#9660;">
+        </th>
+        <th data-type="string">accessed</th>
+      </tr>
+    </thead>
+  </table>
+
+  <script> // build tags object
+    const controller = document.getElementById('keywords-controller');
+
+    controller.addEventListener('click', function initialize() {
+      // one-time click event handler
+      // build controlled element and attach controller
+
+      const table = document.getElementById('table')
+
+      const model = buildTableModel(table)
+      const elem = buildKeywordsElem(model);
+
+      document.body.append(elem);
+
+      // attaches click event handler
+      attachController(elem, this);
+
+      controller.removeEventListener('click', initialize)
+    })
+
+    function buildTableModel(table) {
+      // rows = Array< HTMLTableRowElement >
+      let rows = Array.from(table.rows);
+
+      let head = rows.shift();
+      // fields = Array<string>
+      let fields = Array.from(head.cells).map(elem => {
+        return {
+          type: elem.dataset.type || 'string',
+          name: elem.textContent.trim(),
+        }
+      });
+
+      return rows.map(row => {
+        return fields.reduce((model, field, idx) => {
+          model[field.name] = row.cells[idx].textContent;
+
+          if (field.type === 'array') {
+            model[field.name] = model[field.name].split(',').map(item => item.trim());
+          }
+
+          return model;
+        }, { elem: row })
+      })
+    }
+
+    function buildKeywordsElem(rows) {
+      const keywords = getKeywords(rows);
+      
+      // create container
+      const ul = document.createElement('ul');
+      ul.className = 'checkboxes';
+      
+      // model = Array<{ name: String, li: HTMLLIElement }>
+      let model = keywords.sort((a, b) => a < b ? -1 : 1)
+        .map(keyword => {
+          const li = document.createElement('li');
+          li.innerHTML = `<label><input type="checkbox" name="keyword" value="${keyword}">${keyword}</label>`
+          li.className = 'checkbox';
+
+          return {
+            name: keyword,
+            li,
+          }
+        })
+
+      model.forEach(keyword => ul.append(keyword.li));
+
+      // highlight on check
+      ul.addEventListener('change', event => {
+        const keyword = event.target.value;
+
+        rows.forEach(row => {
+          if (row.keywords.includes(keyword)) {
+            // if box was checked: highlight rows with checked keywords
+            // if box was unchecked: check for other checked keywords before removing highlight
+
+            row.matches = event.target.checked ? (row.matches + 1 || 1) : row.matches - 1;
+            row.elem.style.backgroundColor = row.matches ? 'yellow' : '';
+          }
+        })
+      })
+
+      return ul;
+
+      function getKeywords(rows) {
+        let keywords = new Set();
+
+        rows.forEach(row => {
+          row.keywords.forEach(keyword => keywords.add(keyword));
+        });
+
+        return Array.from(keywords);
+      }
+    }
+
+    function attachController(elem, controller) {
+      // elem.classList.add('hidden');
+      // controller.attached = true;
+
+      const box = controller.closest('th').getBoundingClientRect();
+      elem.style.width = box.width + 'px';
+      elem.style.top = box.bottom + 'px';
+      elem.style.left = box.left + 'px';
+
+      controller.addEventListener('click', () => {
+        elem.classList.toggle('hidden')
+      })
+    }
+  </script>
+</body>
+
+</html>

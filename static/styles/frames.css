@@ -1,0 +1,23 @@
+/* iframe container */
+
+div.widgets-container {
+  display: inline-block;
+}
+
+.widgets-container iframe {
+  height: 600px;
+  border: solid black 2px;
+}
+
+.widgets-container iframe#select,
+.widgets-container iframe#visualeditor {
+  width: 300px;
+}
+
+.widgets-container iframe#texteditor {
+  width: 609px;
+}
+
+.widgets-container #buttons {
+  text-align: right;
+}

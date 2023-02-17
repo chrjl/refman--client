@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/widgets.css">
+
+  <script>
+    /** @global inherits env from caller
+     *  @borrows API_SERVER
+     *  @borrows ENTRIES_ENDPOINT
+     */
+    window.env = window.parent.env || window.opener.env;
+  </script>
+</head>
+
+<body class="widget">
+  <div id="select-container" class="content-container"></div>
+  <form id="buttons" class="buttons-container">
+    <input type="button" name="refresh" value="refresh">
+    <input type="button" name="follow" value="follow">
+    <input type="button" name="DELETE" value="DELETE">
+    <br>
+    <input type="file" name="upload" value="upload" accept="application/json">
+    <input type="button" name="close" value="close file" hidden>
+    <span id="upload-label"></span>
+  </form>
+
+  <script type="module">
+    import Widget from './SelectorWidget.mjs'
+
+    const selectContainer = document.getElementById('select-container');
+    const selector = await Widget.from({
+      server: env.API_SERVER,
+      api: env.ENTRIES_ENDPOINT,
+    });
+
+    selectContainer.append(selector.select);
+
+    selector.select.style.height = selectContainer.clientHeight + 'px';
+    selector.select.addEventListener('dblclick', () => buttons.follow.dispatchEvent(new Event('click')));
+
+    // button handlers
+    buttons.refresh.addEventListener('click', () => selector.refresh());
+    buttons.follow.addEventListener('click', () => selector.follow());
+
+    buttons.DELETE.addEventListener('click', () => {
+      if (!confirm('confirm DELETE')) return;
+
+      const endpoint = selector.selected.links?.find(link => link.rel === 'self');
+      if (!endpoint) {
+        selector.selected.remove();
+        return;
+      }
+
+      selector.DELETE()
+        .then(() => selector.refresh())
+        .then(() => {
+          window.parent.postMessage({ signal: 'clearTextEditor' });
+          window.parent.postMessage({ signal: 'resetVisualEditor' });
+        })
+        .catch(alert);
+    });
+
+    // file upload
+    buttons.upload.addEventListener('change', function (event) {
+      const reader = new FileReader();
+      const file = this.files[0];
+
+      reader.readAsText(file);
+
+      reader.addEventListener('load', () => {
+        selector.refresh(JSON.parse(reader.result))
+
+        buttons.upload.hidden = true;
+        buttons.close.hidden = false;
+        buttons.refresh.disabled = true;
+        buttons.close.value = `close file (${file.name})`
+
+        buttons.close.addEventListener('click', function handler() {
+          selector.refresh();
+
+          buttons.upload.value = '';
+          buttons.upload.hidden = false;
+          buttons.close.hidden = true;
+          buttons.refresh.disabled = false;
+
+          buttons.close.removeEventListener('click', handler);
+        })
+      })
+
+    })
+
+    // change event handler
+    window.addEventListener('change', async (event) => {
+      if (!selector.selected) return; // file open
+
+      const data = await selector.GET();
+
+      buttons.follow.disabled = !('url' in data);
+
+      window.parent.postMessage({
+        signal: 'toTextEditor',
+        message: data,
+      });
+
+      window.parent.postMessage({
+        signal: 'toVisualEditor',
+        message: data,
+      });
+    });
+
+    // message handlers
+    window.addEventListener('message', () => {
+      switch (event.data.signal) {
+        case 'refresh':
+          buttons.refresh.dispatchEvent(new PointerEvent('click'))
+          break;
+        default:
+          console.error(event.data);
+      }
+    })
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,45 @@
+.widget .content-container {
+  position: relative;
+  height: 534px;
+}
+.widget .buttons-container {
+  height: 42px;
+  text-align: center;
+}
+
+.widget div {
+  margin: 8px;
+}
+
+.widget select, .widget textarea, .widget form {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* CSL form widget */
+
+.widget span.label-title {
+  display: block;
+}
+
+.widget label {
+  display: block;
+  margin: 10px auto;
+}
+
+.widget input[type="text"] {
+  width: 250px;
+}
+
+div#book-fields {
+  padding-left: 10px;
+  margin-top: 10px;
+}
+
+div#book-fields input[type="text"] {
+  width: 190px;
+}
+
+div#book-fields label {
+  margin: unset;
+}
