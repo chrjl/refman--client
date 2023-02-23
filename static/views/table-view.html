@@ -5,8 +5,11 @@
 <head>
   <link rel="stylesheet" href="/styles/styles.css">
   <script>
-    window.env = window.opener.env;
-
+    /** @global retrieves env from localStorage (set by caller)
+     *  @borrows API_SERVER
+     *  @borrows JSON_DUMP_ENDPOINT
+     */
+    window.env = JSON.parse(localStorage.getItem('env'));
   </script>
 
   <script type="module">
@@ -56,6 +59,11 @@
 
       link.remove();
     })
+
+    document.body.insertAdjacentHTML('beforeend', `
+      <div style="padding-top: 1rem; font-size: small; font-style: italic;">
+        ${new Date()}
+      </div>`)
   </script>
 </head>
 

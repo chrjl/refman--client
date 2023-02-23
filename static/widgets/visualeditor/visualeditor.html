@@ -5,11 +5,11 @@
   <link rel="stylesheet" href="/styles/widgets.css">
 
   <script>
-    /** @global inherits env from caller
+    /** @global retrieves env from localStorage (set by caller)
      *  @borrows API_SERVER
      *  @borrows METADATA_ENDPOINT
      */
-    window.env = window.parent.env || window.opener.env;
+    window.env = JSON.parse(localStorage.getItem('env'));
   </script>
 </head>
 
@@ -85,8 +85,10 @@
 
   <form id="buttons" class="buttons-container">
     <input type="button" name="reset" value="reset">
-    <input type="button" name="metadata" value="metadata">
-    <input type="button" name="submit" value="toTextEditor">
+    <input type="button" name="metadata" value="fetch metadata">
+    <br>
+    <input type="button" name="toBuffer" value="update buffer">
+    <input type="button" name="fromBuffer" value="pull from buffer">
   </form>
 
   <script type="module">
@@ -96,9 +98,9 @@
     // event handlers
     window.addEventListener('keydown', event => {
       if (event.key === 'Enter' && event.ctrlKey) {
-        buttons.submit.dispatchEvent(new PointerEvent('click'))
+        buttons.submit.dispatchEvent(new PointerEvent('click'));
       }
-    })
+    });
 
     form.accessedStatus.addEventListener('change', () => {
       form.accessed.disabled = !form.accessedStatus.checked;
@@ -114,7 +116,7 @@
       } else {
         if (['webpage', 'post'].includes(form.type.value)) form.online.checked = true;
 
-        bookFields.querySelectorAll('input').forEach(input => input.value = '')
+        bookFields.querySelectorAll('input').forEach(input => input.value = '');
         bookFields.hidden = true;
       }
     });
@@ -130,13 +132,6 @@
     // button handlers
     buttons.reset.addEventListener('click', () => {
       form.reset();
-    })
-
-    buttons.submit.addEventListener('click', () => {
-      window.parent.postMessage({
-        signal: 'toTextEditor',
-        message: visualeditor.generateObj(),
-      });
     });
 
     buttons.metadata.addEventListener('click', async () => {
@@ -144,22 +139,29 @@
       const metadata = await visualeditor.fetchMetadata(endpoint, form.url.value);
 
       visualeditor.populateForm(metadata);
-      window.parent.postMessage({
-        signal: 'toTextEditor', message: metadata
-      })
-    })
-
-    // message handler
-    window.addEventListener('message', (event) => {
-      if (event.data.signal === 'reset') {
-        form.reset();
-      } else if (event.data.signal === 'populate') {
-        form.reset();
-
-        queueMicrotask(() => visualeditor.populateForm(event.data.message));
-        // run after reset completes
-      }
+      localStorage.setItem('buffer', JSON.stringify(metadata));
     });
+
+    buttons.toBuffer.addEventListener('click', () => {
+      localStorage.setItem('buffer', JSON.stringify(visualeditor.generateObj()));
+    });
+
+    buttons.fromBuffer.addEventListener('click', event => {
+      const buffer = localStorage.getItem('buffer');
+      if (buffer) visualeditor.populateForm(JSON.parse(buffer)); 
+    });
+
+    // buffer StorageEvent handler
+    window.addEventListener('storage', event => {
+      if (event.key !== 'buffer') return;
+
+      form.reset();
+
+      // populate form after reset completes
+      if (event.newValue) {
+        queueMicrotask(() => visualeditor.populateForm(JSON.parse(event.newValue)));
+      }
+    })
   </script>
 
 </body>

@@ -17,7 +17,9 @@ class TextEditorWidget {
       body: JSON.stringify(data),
     });
 
-    return res;
+    if (res.status >= 400) throw new Error(`${res.status} ${res.statusText}`);
+
+    return data;
   }
 
   async PUT() {
@@ -30,7 +32,9 @@ class TextEditorWidget {
       body: JSON.stringify(data),
     });
 
-    return res;
+    if (res.status >= 400) throw new Error(`${res.status} ${res.statusText}`);
+
+    return data;
   }
 
   clear() {

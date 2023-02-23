@@ -20,8 +20,9 @@
         ...obj,
         [elem.getAttribute('property')]: elem.getAttribute('value'),
       }), {});
-    }
+    };
 
+    localStorage.setItem('env', JSON.stringify(getEnvFromMeta()));
     window.env = getEnvFromMeta();
   </script>
 </head>
@@ -36,56 +37,35 @@
 
     <form id="buttons">
       <fieldset>
-        <legend>downloads</legend>
-
-        <input type="button" name="download-json" value="json">
-        <input type="button" name="download-archive" value="archive">
-        <input type="button" name="download-biblatex" value="BibLaTeX">
+        <legend>control</legend>
+        <input type="button" name="clear-storage" value="localStorage.clear()">
       </fieldset>
 
       <fieldset>
         <legend>displays</legend>
         <input type="button" name="html-table" value="HTML table">
       </fieldset>
+
+      <fieldset>
+        <legend>downloads</legend>
+
+        <input type="button" name="download-json" value="json">
+        <input type="button" name="download-archive" value="archive">
+        <input type="button" name="download-biblatex" value="BibLaTeX">
+      </fieldset>
     </form>
   </div>
 </body>
 
 <script type="module">
-  const router = {  // route received messages, by event.data.signal
-    refreshSelector: {
-      dest: window.frames.selector,
-      signal: 'refresh',
-    },
-    clearTextEditor: {
-      dest: window.frames.texteditor,
-      signal: 'clear',
-    },
-    toTextEditor: {
-      dest: window.frames.texteditor,
-      signal: 'display',
-    },
-    resetVisualEditor: {
-      dest: window.frames.visualeditor,
-      signal: 'reset',
-    },
-    toVisualEditor: {
-      dest: window.frames.visualeditor,
-      signal: 'populate',
-    }
-  }
-
-  window.addEventListener('message', event => {
-    const { dest, signal } = router[event.data.signal];
-    dest.postMessage({ signal, message: event.data.message });
-  });
-
   // button handlers
-  import handlers from '/scripts/handlers.js'
+  import handlers from '/scripts/handlers.js';
 
   buttons['html-table'].addEventListener('click', () => {
-    window.open('/views/table-view.html')
-  })
+    window.open('/views/table-view.html');
+  });
+
+  buttons['clear-storage'].addEventListener('click', () => localStorage.clear());
 
   buttons['download-archive'].addEventListener('click', async () => {
     const response = await fetch(env.API_SERVER + env.ARCHIVE_ENDPOINT);
@@ -96,7 +76,7 @@
       blob,
       basename: `db_${new Date().toISOString()}`,
       extname: '.tgz'
-    })
+    });
   });
 
   buttons['download-json'].addEventListener('click', async () => {
@@ -108,7 +88,7 @@
       blob,
       basename: `db_${new Date().toISOString()}`,
       extname: '.json'
-    })
+    });
 
   });
 
@@ -118,13 +98,13 @@
     const model = await response.json();
 
     // const { default: generateBib } = await import('/scripts/generate-biblatex.js');
-    const blob = new Blob([handlers.generateBib(model)], { type: 'text/x-bibtex' })
+    const blob = new Blob([handlers.generateBib(model)], { type: 'text/x-bibtex' });
 
     handlers.download({
       blob,
       basename: `db_${new Date().toISOString()}`,
       extname: '.bib'
-    })
+    });
   });
 </script>
 

@@ -5,11 +5,11 @@
   <link rel="stylesheet" href="/styles/widgets.css">
 
   <script>
-    /** @global inherits env from caller
+    /** @global retrieves env from localStorage (set by caller)
      *  @borrows API_SERVER
      *  @borrows ENTRIES_ENDPOINT
      */
-    window.env = window.parent.env || window.opener.env;
+    window.env = JSON.parse(localStorage.getItem('env'));
   </script>
 </head>
 
@@ -17,9 +17,11 @@
   <div id="textarea-container" class="content-container"></div>
   <form id="buttons" class="buttons-container">
     <input type="button" name="clear" value="clear">
-    <input type="button" name="toVisualEditor" value="toVisualEditor">
     <input type="button" name="PUT" value="PUT">
     <input type="button" name="POST" value="POST">
+    <br>
+    <input type="button" name="toBuffer" value="update buffer">
+    <input type="button" name="fromBuffer" value="pull from buffer">
   </form>
 
   <script type="module">
@@ -27,55 +29,66 @@
 
     const collectionEndpoint = env.API_SERVER + env.ENTRIES_ENDPOINT;
 
-    const textareaContainer = document.getElementById('textarea-container')
+    const textareaContainer = document.getElementById('textarea-container');
     const texteditor = new Widget(collectionEndpoint);
 
-    texteditor.textarea.style.height = textareaContainer.clientHeight + 'px';
+    texteditor.textarea.style.height = '100%';
     textareaContainer.append(texteditor.textarea);
+
+    // event handlers
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.ctrlKey) {
+        buttons.toBuffer.dispatchEvent(new PointerEvent('click'));
+      }
+    });
 
     // button handlers
     buttons.clear.addEventListener('click', () => texteditor.clear());
+
     buttons.POST.addEventListener('click', () => {
       texteditor.POST()
-        .then(res => {
-          if (res.status >= 400) throw new Error(`${res.status} ${res.statusText}`);
-
-          window.parent.postMessage({ signal: 'refreshSelector' });
-        })
+        .then(data => localStorage.setItem('buffer', JSON.stringify(data)))
         .catch(err => alert(err));
-    })
+    });
+
     buttons.PUT.addEventListener('click', () => {
       texteditor.PUT()
-        .then(res => {
-          if (res.status >= 400) throw new Error(`${res.status} ${res.statusText}`);
-        })
+        .then(data => localStorage.setItem('buffer', JSON.stringify(data)))
         .catch(err => alert(err));
-    })
-    buttons.toVisualEditor.addEventListener('click', () => {
+    });
+
+    buttons.toBuffer.addEventListener('click', () => {
       try {
-        window.parent.postMessage({
-          signal: 'toVisualEditor',
-          message: JSON.parse(texteditor.textarea.value),
-        });
+        // remove buffer if input is empty 
+        // write to buffer if input is valid JSON
+
+        if (!texteditor.textarea.value) {
+          localStorage.removeItem('buffer');
+        } else {
+          localStorage.setItem('buffer', JSON.stringify(JSON.parse(texteditor.textarea.value)));
+        }
       } catch (err) {
         if (err instanceof SyntaxError) alert(err);
         throw err;
       }
     });
 
-    // message handler
-    window.addEventListener('message', (event) => {
-      switch (event.data.signal) {
-        case 'display':
-          texteditor.textarea.value = JSON.stringify(event.data.message, null, 2);
-          break;
-        case 'clear':
-          texteditor.textarea.value = '';
-          break;
-        default:
-          console.error(event.data)
-      }
+    buttons.fromBuffer.addEventListener('click', () => {
+      const buffer = localStorage.getItem('buffer');
+
+      texteditor.textarea.value = buffer
+        ? JSON.stringify(JSON.parse(buffer), null, 2)
+        : '';
     });
+
+    // buffer StorageEvent handler
+    window.addEventListener('storage', event => {
+      if (event.key !== 'buffer') return;
+
+      texteditor.textarea.value = event.newValue
+        ? JSON.stringify(JSON.parse(event.newValue), null, 2)
+        : '';
+    })
   </script>
 </body>
 
