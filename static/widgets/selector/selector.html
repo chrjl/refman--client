@@ -5,11 +5,11 @@
   <link rel="stylesheet" href="/styles/widgets.css">
 
   <script>
-    /** @global inherits env from caller
+    /** @global retrieves env from localStorage (set by caller)
      *  @borrows API_SERVER
      *  @borrows ENTRIES_ENDPOINT
      */
-    window.env = window.parent.env || window.opener.env;
+    window.env = JSON.parse(localStorage.getItem('env'));
   </script>
 </head>
 
@@ -26,7 +26,7 @@
   </form>
 
   <script type="module">
-    import Widget from './SelectorWidget.mjs'
+    import Widget from './SelectorWidget.mjs';
 
     const selectContainer = document.getElementById('select-container');
     const selector = await Widget.from({
@@ -36,8 +36,15 @@
 
     selectContainer.append(selector.select);
 
-    selector.select.style.height = selectContainer.clientHeight + 'px';
+    selector.select.style.height = '100%';
     selector.select.addEventListener('dblclick', () => buttons.follow.dispatchEvent(new Event('click')));
+
+    // keybindings
+    window.addEventListener('keydown', event => {
+      if (event.key !== 'Delete') return;
+
+      buttons.DELETE.dispatchEvent(new PointerEvent('click'));
+    });
 
     // button handlers
     buttons.refresh.addEventListener('click', () => selector.refresh());
@@ -47,17 +54,10 @@
       if (!confirm('confirm DELETE')) return;
 
       const endpoint = selector.selected.links?.find(link => link.rel === 'self');
-      if (!endpoint) {
-        selector.selected.remove();
-        return;
-      }
+      if (!endpoint) return;
 
       selector.DELETE()
-        .then(() => selector.refresh())
-        .then(() => {
-          window.parent.postMessage({ signal: 'clearTextEditor' });
-          window.parent.postMessage({ signal: 'resetVisualEditor' });
-        })
+        .then(() => selector.selected.remove())
         .catch(alert);
     });
 
@@ -69,12 +69,13 @@
       reader.readAsText(file);
 
       reader.addEventListener('load', () => {
-        selector.refresh(JSON.parse(reader.result))
+        selector.refresh(JSON.parse(reader.result));
 
         buttons.upload.hidden = true;
         buttons.close.hidden = false;
         buttons.refresh.disabled = true;
-        buttons.close.value = `close file (${file.name})`
+        buttons.DELETE.disabled = true;
+        buttons.close.value = `close file (${file.name})`;
 
         buttons.close.addEventListener('click', function handler() {
           selector.refresh();
@@ -83,12 +84,12 @@
           buttons.upload.hidden = false;
           buttons.close.hidden = true;
           buttons.refresh.disabled = false;
+          buttons.DELETE.disabled = false;
 
           buttons.close.removeEventListener('click', handler);
-        })
-      })
-
-    })
+        });
+      });
+    });
 
     // change event handler
     window.addEventListener('change', async (event) => {
@@ -98,27 +99,9 @@
 
       buttons.follow.disabled = !('url' in data);
 
-      window.parent.postMessage({
-        signal: 'toTextEditor',
-        message: data,
-      });
-
-      window.parent.postMessage({
-        signal: 'toVisualEditor',
-        message: data,
-      });
+      // push selection to buffer
+      window.localStorage.setItem('buffer', JSON.stringify(data));
     });
-
-    // message handlers
-    window.addEventListener('message', () => {
-      switch (event.data.signal) {
-        case 'refresh':
-          buttons.refresh.dispatchEvent(new PointerEvent('click'))
-          break;
-        default:
-          console.error(event.data);
-      }
-    })
   </script>
 </body>
 

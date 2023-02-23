@@ -1,9 +1,11 @@
 class SelectorWidget {
-  constructor(arr) {
-    this.select.setAttribute('size', 10);
-
-    if (arr) this.populate(arr);
+  constructor() {
+    this.select.setAttribute('size', 2);
   }
+
+  data = {};
+
+  select = document.createElement('select');
 
   static async from({ server, api }) {
     const selector = new SelectorWidget();
@@ -15,11 +17,7 @@ class SelectorWidget {
     return selector;
   }
 
-  // FIELDS
-
-  data = {};
-
-  select = document.createElement('select');
+  // METHODS
 
   get selected() {
     const { select } = this;
@@ -30,10 +28,12 @@ class SelectorWidget {
     return option;
   }
 
-  // METHODS
+  async populate() {
+    // populate <select> with <option> elements
+    // async populate(entries) {
 
-  async populate(entries) {
     const { select } = this;
+    const entries = JSON.parse(localStorage.getItem('entries'));
 
     entries.forEach((entry) => {
       const option = document.createElement('option');
@@ -44,30 +44,31 @@ class SelectorWidget {
       option.data = data;
       option.links = links;
 
-      select.append(option);
+      select.add(option);
     });
+  }
+
+  async refresh(arr) {
+    // fill <select> with <options> using populate method
+    // if arr is not provided: fetch data from api server
+    let entries = [];
+
+    if (arr) {
+      entries = arr;
+    } else if (this.server) {
+      const response = await fetch(this.server + this.api);
+      entries = await response.json();
+    }
+
+    this.select.innerHTML = '';
+    localStorage.removeItem('entries');
+    localStorage.setItem('entries', JSON.stringify(entries));
+
+    this.populate();
   }
 
   follow() {
     if (this.data.url) window.open(this.data.url);
-  }
-
-  async refresh(obj) {
-    let entries = {};
-
-    if (obj) {
-      this.select.innerHTML = '';
-      this.populate(obj);
-      return;
-    }
-
-    if (this.server) {
-      const response = await fetch(this.server + this.api);
-      entries = await response.json();
-
-      this.select.innerHTML = '';
-      await this.populate(entries);
-    }
   }
 
   async GET() {
@@ -85,17 +86,17 @@ class SelectorWidget {
   }
 
   async DELETE() {
-    // const endpoint = this.selected.links?.find((link) => link.rel === 'self').href;
-
     if (!this.selected.endpoint) return;
 
     const path = this.server + this.selected.endpoint;
 
     try {
       const res = await fetch(path, { method: 'DELETE' });
-      const statusMessage = `${res.status} ${res.statusText}`;
 
+      const statusMessage = `${res.status} ${res.statusText}`;
       if (res.status >= 400) throw new Error(statusMessage);
+
+      localStorage.removeItem('buffer');
     } catch (err) {
       alert(err);
     }

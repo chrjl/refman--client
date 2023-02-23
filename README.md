@@ -17,7 +17,7 @@ Architecture
 
 `app.html`
 
-> Framework: HTML `iframe` communicating over `MessageEvent`, `fetch` from API server
+> Framework: HTML `iframe` communicating over Web Storage (`localStorage`), `fetch` from API server
 
 - Controller for entries API
 - Getter for metadata API
@@ -51,3 +51,23 @@ Fields supported
 - accessed (date)
 - keywords (comma-separated list => json array)
 - [ ] extended (json object, TextEditor only)
+
+Changes
+-------
+
+- [x] Widget `iframe`s change to pull model
+  - Old method: push model (`postMessage` on change)
+  - New method: pull model (widgets add `StorageEvent` listeners and handlers)
+
+- [x] Add fetch date to `table-view`
+- [x] `env` shared over `localStorage` instead of `window.[parent|opener]`
+- [x] `Selector`, on `DELETE`: remove `<option>` element (old method: `refresh` from source)
+
+UI
+
+- [x] `Delete` keybinding on `selector`
+- [x] Disable `DELETE` button on file upload
+
+Syntax
+
+- [x] `Selector`: change `select.append` to `select.add`
