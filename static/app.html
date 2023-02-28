@@ -13,7 +13,7 @@
   <meta property="BIBLATEX_ENDPOINT" value="/archives/generate-biblatex">
 
   <script>
-    const getEnvFromMeta = function () {
+    const setEnvFromMeta = function () {
       const properties = document.head.querySelectorAll('meta[property]');
 
       return [...properties].reduce((obj, elem) => ({
@@ -22,8 +22,41 @@
       }), {});
     };
 
-    localStorage.setItem('env', JSON.stringify(getEnvFromMeta()));
-    window.env = getEnvFromMeta();
+    window.env = setEnvFromMeta();
+    localStorage.setItem('env', JSON.stringify(env));
+  </script>
+
+  <script>
+    const DBOpenRequest = indexedDB.open('refman');
+
+    // initialize indexedDB
+    DBOpenRequest.onerror = () => console.error('indexedDB.open error');
+    DBOpenRequest.onupgradeneeded = (event) => {
+      const db = event.target.result;
+
+      if (!db.objectStoreNames.contains('entries')) {
+        db.createObjectStore('entries', { keyPath: 'id' });
+      }
+    };
+
+    // fetch JSON dump and populate indexedDB
+    DBOpenRequest.onsuccess = (event) => {
+      const db = event.target.result;
+      const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
+
+      fetch(endpoint)
+        .then(res => res.json())
+        .then(entries => {
+          const transaction = db.transaction('entries', 'readwrite');
+          const entriesStore = transaction.objectStore('entries');
+
+          const req = entriesStore.clear();
+
+          req.onsuccess = () => {
+            entries.forEach((entry) => entriesStore.put(entry));
+          };
+        });
+    };
   </script>
 </head>
 
@@ -39,6 +72,7 @@
       <fieldset>
         <legend>control</legend>
         <input type="button" name="clear-storage" value="localStorage.clear()">
+        <input type="button" name="refresh-DB" value="refresh indexedDB">
       </fieldset>
 
       <fieldset>
