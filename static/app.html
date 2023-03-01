@@ -26,37 +26,23 @@
     localStorage.setItem('env', JSON.stringify(env));
   </script>
 
-  <script>
-    const DBOpenRequest = indexedDB.open('refman');
+  <script type="module"> //indexedDB
+    import idb from '/dev/idb.js';
 
-    // initialize indexedDB
-    DBOpenRequest.onerror = () => console.error('indexedDB.open error');
-    DBOpenRequest.onupgradeneeded = (event) => {
-      const db = event.target.result;
+    buttons['clear-DB'].onclick = idb.app.clearEntries;
 
-      if (!db.objectStoreNames.contains('entries')) {
-        db.createObjectStore('entries', { keyPath: 'id' });
-      }
-    };
+    buttons['sync-DB'].onclick = syncEntries;
 
-    // fetch JSON dump and populate indexedDB
-    DBOpenRequest.onsuccess = (event) => {
-      const db = event.target.result;
+    async function syncEntries() {
       const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
+      const res = await fetch(endpoint);
+      const data = await res.json();
 
-      fetch(endpoint)
-        .then(res => res.json())
-        .then(entries => {
-          const transaction = db.transaction('entries', 'readwrite');
-          const entriesStore = transaction.objectStore('entries');
-
-          const req = entriesStore.clear();
-
-          req.onsuccess = () => {
-            entries.forEach((entry) => entriesStore.put(entry));
-          };
-        });
-    };
+      idb.app.clearEntries();
+      idb.app.putEntries(data);
+      
+      console.log(`put ${data.length} entries`)
+    }
   </script>
 </head>
 
@@ -72,7 +58,10 @@
       <fieldset>
         <legend>control</legend>
         <input type="button" name="clear-storage" value="localStorage.clear()">
-        <input type="button" name="refresh-DB" value="refresh indexedDB">
+        <br>
+        <legend>indexedDB</legend>
+        <input type="button" name="clear-DB" value="clear entries">
+        <input type="button" name="sync-DB" value="sync entries">
       </fieldset>
 
       <fieldset>
