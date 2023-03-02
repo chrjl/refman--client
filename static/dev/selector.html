@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/widgets.css">
+
+  <script>
+    /** @global retrieves env from localStorage (set by caller)
+     *  @borrows API_SERVER
+     *  @borrows ENTRIES_ENDPOINT
+     */
+    window.env = JSON.parse(localStorage.getItem('env'));
+    let buffer;
+  </script>
+</head>
+
+<body class="widget">
+  <div id="select-container" class="content-container">
+    <select id="selector" size="2"></select>
+    <select id="upload-selector" size="2" hidden></select>
+  </div>
+  <form id="buttons" class="buttons-container">
+    <input type="button" name="follow" value="follow">
+    <input type="button" name="DELETE" value="DELETE">
+    <br>
+    <input type="file" name="upload" value="upload" accept="application/json">
+    <input type="button" name="close" value="close file" hidden>
+    <span id="upload-label"></span>
+  </form>
+
+  <script type="module">
+    import idb from '/dev/idb.js';
+
+    const entries = await idb.app.getAll('entries');
+
+    const selectContainer = document.getElementById('select-container');
+    const selector = document.getElementById('selector');
+    selector.store = 'entries';
+
+    entries.forEach(entry => {
+      const option = document.createElement('option');
+      option.textContent = option.id = entry.id;
+      selector.add(option);
+    });
+
+    // <select> element event handlers
+    selectContainer.onchange = async (event) => {
+      const id = event.target.value;
+      const store = event.target.store;
+      const entry = await idb.app.get(store, id);
+
+      buttons.follow.disabled = !('url' in entry);
+
+      buffer = entry;
+      localStorage.setItem('buffer', JSON.stringify(entry));
+    };
+
+    selectContainer.ondblclick = () => {
+      buttons.follow.dispatchEvent(new PointerEvent('click'));
+    };
+
+    // keybindings
+    selectContainer.addEventListener('keydown', event => {
+      if (event.key === 'Delete') {
+        buttons.DELETE.dispatchEvent(new PointerEvent('click'));
+      }
+    });
+
+    // button handlers
+    buttons.follow.onclick = () => {
+      if (buffer.url) window.open(buffer.url);
+    };
+
+    buttons.DELETE.onclick = async () => {
+      if (!confirm('confirm DELETE')) return;
+      const endpoint = `${env.API_SERVER}${env.ENTRIES_ENDPOINT}/${buffer.id}`;
+
+      try {
+        const res = await fetch(endpoint, { method: 'DELETE' });
+
+        const statusMessage = `${res.status} ${res.statusText}`;
+        if (res.status >= 400) throw new Error(statusMessage);
+
+        await idb.app.delete('entries', buffer.id);
+        selector.querySelector(`option#${buffer.id}`).remove();
+      } catch (err) {
+        alert(err);
+      }
+    };
+
+    // file upload
+    buttons.upload.onchange = function (event) {
+      const reader = new FileReader();
+      const file = this.files[0];
+
+      reader.readAsText(file);
+
+      reader.onload = async () => {
+        const uploadEntries = JSON.parse(reader.result);
+        const tx = idb.app.transaction('upload', 'readwrite');
+
+        await Promise.all(
+          uploadEntries.map((entry) => tx.store.put(entry)),
+          tx.done
+        );
+
+        const uploadSelector = document.createElement('select');
+        uploadSelector.store = 'upload';
+
+        uploadEntries.forEach((entry) => {
+          const option = document.createElement('option');
+          option.textContent = option.id = entry.id;
+          uploadSelector.add(option);
+        });
+
+        selector.replaceWith(uploadSelector);
+
+        buttons.upload.hidden = true;
+        buttons.close.hidden = false;
+        buttons.DELETE.disabled = true;
+        buttons.close.value = `close file (${file.name})`;
+
+        buttons.close.addEventListener('click', function handler() {
+          uploadSelector.replaceWith(selector);
+          idb.app.clear('upload');
+
+          buttons.upload.value = '';
+          buttons.upload.hidden = false;
+          buttons.close.hidden = true;
+          buttons.DELETE.disabled = false;
+
+          buttons.close.removeEventListener('click', handler);
+        });
+      };
+    };
+  </script>
+</body>
+
+</html>

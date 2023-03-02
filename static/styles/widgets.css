@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+.content-container select {
+  height: 100%;
+}
+
 /* CSL form widget */
 
 .widget span.label-title {

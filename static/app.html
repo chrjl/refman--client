@@ -29,20 +29,20 @@
   <script type="module"> //indexedDB
     import idb from '/dev/idb.js';
 
-    buttons['clear-DB'].onclick = idb.app.clearEntries;
+    buttons['clear-DB'].onclick = () => idb.app.clear('entries');
 
-    buttons['sync-DB'].onclick = syncEntries;
-
-    async function syncEntries() {
+    buttons['refresh-DB'].onclick = async () => {
       const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
       const res = await fetch(endpoint);
       const data = await res.json();
 
-      idb.app.clearEntries();
-      idb.app.putEntries(data);
-      
-      console.log(`put ${data.length} entries`)
-    }
+      const tx = idb.app.transaction('entries', 'readwrite');
+      await Promise.all([
+        tx.store.clear(),
+        ...data.map((entry) => tx.store.put(entry)),
+        tx.done,
+      ]);
+    };
   </script>
 </head>
 
@@ -58,10 +58,13 @@
       <fieldset>
         <legend>control</legend>
         <input type="button" name="clear-storage" value="localStorage.clear()">
-        <br>
+      </fieldset>
+
+      <fieldset>
         <legend>indexedDB</legend>
-        <input type="button" name="clear-DB" value="clear entries">
-        <input type="button" name="sync-DB" value="sync entries">
+        <legend style="text-align:center;">entries</legend>
+        <input type="button" name="clear-DB" value="clear object store">
+        <input type="button" name="refresh-DB" value="fetch from server">
       </fieldset>
 
       <fieldset>
