@@ -10,6 +10,7 @@
      *  @borrows ENTRIES_ENDPOINT
      */
     window.env = JSON.parse(localStorage.getItem('env'));
+
     let buffer;
   </script>
 </head>
@@ -17,10 +18,8 @@
 <body class="widget">
   <div id="select-container" class="content-container">
     <select id="selector" size="2"></select>
-    <select id="upload-selector" size="2" hidden></select>
   </div>
   <form id="buttons" class="buttons-container">
-    <input type="button" name="follow" value="follow">
     <input type="button" name="DELETE" value="DELETE">
     <br>
     <input type="file" name="upload" value="upload" accept="application/json">
@@ -29,7 +28,7 @@
   </form>
 
   <script type="module">
-    import idb from '/dev/idb.js';
+    import idb from '/scripts/idb.js';
 
     const entries = await idb.app.getAll('entries');
 
@@ -49,14 +48,17 @@
       const store = event.target.store;
       const entry = await idb.app.get(store, id);
 
-      buttons.follow.disabled = !('url' in entry);
-
       buffer = entry;
       localStorage.setItem('buffer', JSON.stringify(entry));
     };
 
     selectContainer.ondblclick = () => {
-      buttons.follow.dispatchEvent(new PointerEvent('click'));
+      if (buffer.url) window.open(buffer.url);
+    };
+
+    selectContainer.onkeydown = (event) => {
+      if (event.key !== 'Enter') return;
+      if (buffer.url) window.open(buffer.url);
     };
 
     // keybindings
@@ -67,12 +69,8 @@
     });
 
     // button handlers
-    buttons.follow.onclick = () => {
-      if (buffer.url) window.open(buffer.url);
-    };
-
     buttons.DELETE.onclick = async () => {
-      if (!confirm('confirm DELETE')) return;
+      if (!confirm(`confirm DELETE ${buffer.id}`)) return;
       const endpoint = `${env.API_SERVER}${env.ENTRIES_ENDPOINT}/${buffer.id}`;
 
       try {
@@ -83,6 +81,9 @@
 
         await idb.app.delete('entries', buffer.id);
         selector.querySelector(`option#${buffer.id}`).remove();
+        
+        buffer = {};
+        localStorage.removeItem('buffer');
       } catch (err) {
         alert(err);
       }
@@ -105,6 +106,7 @@
         );
 
         const uploadSelector = document.createElement('select');
+        uploadSelector.size = 2;
         uploadSelector.store = 'upload';
 
         uploadEntries.forEach((entry) => {

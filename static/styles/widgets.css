@@ -11,13 +11,21 @@
   margin: 8px;
 }
 
-.widget select, .widget textarea, .widget form {
+.widget select,
+.widget textarea,
+.widget form {
   width: 100%;
   box-sizing: border-box;
 }
 
-.content-container select {
+.content-container select,
+.content-container textarea {
   height: 100%;
+}
+
+#visualeditor textarea {
+  display: border-box;
+  width: 250px;
 }
 
 /* CSL form widget */
@@ -31,7 +39,7 @@
   margin: 10px auto;
 }
 
-.widget input[type="text"] {
+.widget input[type='text'] {
   width: 250px;
 }
 
@@ -40,7 +48,7 @@ div#book-fields {
   margin-top: 10px;
 }
 
-div#book-fields input[type="text"] {
+div#book-fields input[type='text'] {
   width: 190px;
 }
 

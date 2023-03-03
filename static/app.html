@@ -26,8 +26,8 @@
     localStorage.setItem('env', JSON.stringify(env));
   </script>
 
-  <script type="module"> //indexedDB
-    import idb from '/dev/idb.js';
+  <script type="module"> // open connection to indexedDB and set handlers
+    import idb from '/scripts/idb.js';
 
     buttons['clear-DB'].onclick = () => idb.app.clear('entries');
 
