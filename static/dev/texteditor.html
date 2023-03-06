@@ -10,8 +10,7 @@
      *  @borrows ENTRIES_ENDPOINT
      */
     window.env = JSON.parse(localStorage.getItem('env'));
-
-    let buffer;
+    let buffer = JSON.parse(localStorage.getItem('buffer') || '{}');
   </script>
 </head>
 

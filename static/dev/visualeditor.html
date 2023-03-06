@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/widgets.css">
+  <link rel="stylesheet" href="/styles/styles.css">
+
+  <script>
+    /** @global retrieves env from localStorage (set by caller)
+     *  @borrows API_SERVER
+     *  @borrows METADATA_ENDPOINT
+     */
+    window.env = JSON.parse(localStorage.getItem('env'));
+    window.buffer = fromStorage('buffer');
+
+    function fromStorage(itemKey) {
+      let model = JSON.parse(localStorage.getItem(itemKey)) || {};
+
+      return new Proxy(model, {
+        set(target, property, value) {
+          Reflect.set(target, property, value);
+          localStorage.setItem(itemKey, JSON.stringify(target));
+        },
+
+        deleteProperty(target, property) {
+          console.log({ property, type: typeof property });
+          if (typeof property === Array) { console.log('delete array requested'); }
+          Reflect.deleteProperty(target, property);
+          localStorage.setItem(itemKey, JSON.stringify(target));
+        }
+      });
+    }
+  </script>
+</head>
+
+<body class="widget">
+  <div id="form-container" class="content-container">
+    <form id="visualeditor"></form>
+  </div>
+
+  <form id="buttons" class="buttons-container">
+    <input type="button" name="metadata" value="fetch metadata">
+    <input type="button" name="clear-textarea" value="clear textarea">
+    <br>
+    <input type="button" name="reset" value="reset">
+    <input type="button" name="revert" value="revert">
+    <input type="button" name="save" value="save">
+  </form>
+
+  <script type="module">
+    const formContainer = document.getElementById('form-container');
+    const visualeditor = document.getElementById('visualeditor');
+
+    const fields = [
+      { name: 'id', type: 'text', ['data-type']: String, placeholder: '(required)' },
+      { name: 'type', type: 'text', ['data-type']: String, placeholder: 'webpage | article | report | post | collection | book' },
+      { name: 'url', type: 'text', ['data-type']: String },
+      { name: 'title', type: 'text', ['data-type']: String },
+      { name: 'author', type: 'text', ['data-type']: Array, placeholder: 'comma-separated list' },
+      { name: 'keywords', type: 'text', ['data-type']: Array, placeholder: 'comma-separated list' },
+      { name: 'publisher', type: 'text', ['data-type']: String },
+      { name: 'issued', type: 'text', ['data-type']: String },
+      { name: 'online', type: 'checkbox', ['data-type']: Boolean },
+      { name: 'accessed?', type: 'checkbox', checked: false },
+      { name: 'accessed', type: 'date', ['data-type']: Date, disabled: true },
+      { name: 'rest', type: 'textarea', ['data-type']: Object },
+    ];
+
+    const fieldTypes = fields.reduce((obj, field) => {
+      obj[field.name] = field['data-type'];
+      return obj;
+    }, {});
+
+    // build input elements
+    const inputs = fields.map(field => {
+      const elem = document.createElement('label');
+
+      const title = document.createElement('span');
+      title.textContent = field.name;
+
+      const input = document.createElement('input');
+      Object.assign(input, field);
+      input.dataset.type = field['data-type']?.name;
+
+      elem.append(title);
+      elem.append(input);
+
+      if (input.type === 'checkbox') {
+        input.insertAdjacentElement('afterend', title);
+      }
+
+      if (input.name === 'accessed') {
+        title.remove();
+      }
+
+      return elem;
+    });
+
+    const rest = document.createElement('textarea');
+    rest.name = 'rest';
+    rest['data-type'] = Object;
+    rest.textContent = '{}';
+    rest.wrap = 'off';
+    rest.rows = 6;
+
+    visualeditor.append(...inputs);
+    visualeditor.rest.replaceWith(rest);
+    visualeditor.accessed.valueAsDate = new Date();
+
+    visualeditor.onreset = function (event) {
+      this['accessed?'].checked = false;
+      this.accessed.disabled = true;
+
+      queueMicrotask(() => { // tasks to perform after default reset action
+        this.accessed.valueAsDate = new Date();
+      });
+    };
+
+    visualeditor.revert = function (buffer) {
+      const rest = {};
+
+      Object.entries(buffer).forEach(([key, value]) => {
+        if (visualeditor.elements.namedItem(key)) {
+          visualeditor[key].value = value;
+        } else {
+          rest[key] = value;
+        }
+      });
+
+      visualeditor.rest.value = JSON.stringify(rest, null, 2);
+
+      if ('accessed' in buffer) {
+        visualeditor['accessed?'].checked = true;
+        visualeditor.accessed.disabled = false;
+      }
+      return rest;
+    };
+
+    visualeditor.reset();
+
+    // pull buffered entry/update on storage
+    window.onstorage = (event) => {
+      if (event.key !== 'buffer') return;
+
+      buffer = fromStorage('buffer');
+
+      visualeditor.reset();
+      setTimeout(() => visualeditor.revert(buffer));
+    };
+
+    // push updates to buffer
+    visualeditor.save = function () {
+      const formData = new FormData(visualeditor);
+      const fd = new FormData(this);
+
+      const formModel = [...fd.entries()].reduce((model, [key, value]) => {
+        if (value) {
+          switch (fieldTypes[key]) {
+            case Array:
+              model[key] = value.split(',').map(elem => elem.trim());
+              break;
+            case Object:
+              Object.assign(model, JSON.parse(value));
+              break;
+            case undefined:
+              break;
+            default:
+              model[key] = value;
+              break;
+          }
+        }
+
+        return model;
+      }, {});
+
+      localStorage.setItem('buffer', JSON.stringify(formModel));
+      buffer = fromStorage('buffer');
+    };
+
+    buttons.save.onclick = () => visualeditor.save();
+
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.ctrlKey) {
+        buttons.save.dispatchEvent(new PointerEvent('click'));
+      }
+    });
+
+    // responsive input elements
+    visualeditor.addEventListener('change', function (event) {
+      switch (event.target.name) {
+        case 'accessed?':
+          this.accessed.disabled = !this['accessed?'].checked;
+          break;
+        case 'type':
+          let rest = JSON.parse(this.rest.value);
+
+          if (event.target.value === 'book') {
+            if (!rest.booktitle) rest.booktitle = '';
+            if (!rest.edition) rest.edition = '';
+          } else {
+            if (!rest.booktitle) delete rest.booktitle;
+            if (!rest.edition) delete rest.edition;
+          }
+
+          this.rest.value = JSON.stringify(rest, null, 2);
+          break;
+      }
+    });
+
+    // button handlers
+    buttons.reset.onclick = () => visualeditor.reset();
+    buttons.revert.onclick = () => {
+      visualeditor.reset();
+      setTimeout(() => visualeditor.revert(buffer));
+    };
+
+    buttons['clear-textarea'].onclick = () => {
+      visualeditor.rest.value = '{}';
+    }
+
+    buttons.metadata.onclick = async () => {
+      const endpoint = env.API_SERVER + env.METADATA_ENDPOINT;
+      const metadata = await fetchMetadata(endpoint, visualeditor.url.value);
+      
+      console.log(metadata);
+
+      localStorage.setItem('buffer', JSON.stringify(metadata));
+      buffer = fromStorage('buffer');
+      visualeditor.revert(buffer);
+
+      async function fetchMetadata(endpoint, url) {
+        const searchParams = new URLSearchParams();
+        searchParams.set('url', url);
+
+        try {
+          const res = await fetch(`${endpoint}?${searchParams}`);
+          if (res.status >= 400) throw new Error(`${res.status} ${res.statusText}\n${res.url}`);
+
+          const metadata = await res.json();
+          metadata.online = true;
+
+          return metadata;
+        } catch (err) {
+          alert(err);
+        }
+      };
+    };
+  </script>
+
+</body>
+
+</html>

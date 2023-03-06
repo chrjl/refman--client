@@ -23,23 +23,28 @@
   height: 100%;
 }
 
+/* visualeditor form widget */
+
 #visualeditor textarea {
-  display: border-box;
+  display: block;
+  box-sizing: content-box;
   width: 250px;
 }
 
-/* CSL form widget */
+.content-container {
+  overflow-y: auto;
+}
 
-.widget span.label-title {
+.content-container label {
   display: block;
 }
 
-.widget label {
+.content-container input[type]:not([type='checkbox']) {
+  margin-bottom: 10px;
   display: block;
-  margin: 10px auto;
 }
 
-.widget input[type='text'] {
+.content-container input[type='text'] {
   width: 250px;
 }
 
