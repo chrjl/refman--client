@@ -10,7 +10,6 @@
      *  @borrows ENTRIES_ENDPOINT
      */
     window.env = JSON.parse(localStorage.getItem('env'));
-    let buffer = JSON.parse(localStorage.getItem('buffer') || '{}');
   </script>
 </head>
 
@@ -19,17 +18,18 @@
     <select id="selector" size="2"></select>
   </div>
   <form id="buttons" class="buttons-container">
-    <input type="button" name="DELETE" value="DELETE">
     <br>
     <input type="file" name="upload" value="upload" accept="application/json">
-    <input type="button" name="close" value="close file" hidden>
+    <button type="button" name="close" hidden>close file</button>
     <span id="upload-label"></span>
   </form>
 
   <script type="module">
     import idb from '/scripts/idb.js';
+    import StorageProxy from '/scripts/storage-proxy.js';
 
-    const entries = await idb.app.getAll('entries');
+    window.buffer = new StorageProxy('buffer');
+    window.entries = await idb.app.getAll('entries');
 
     const selectContainer = document.getElementById('select-container');
     const selector = document.getElementById('selector');
@@ -47,8 +47,8 @@
       const store = event.target.store;
       const entry = await idb.app.get(store, id);
 
-      buffer = entry;
       localStorage.setItem('buffer', JSON.stringify(entry));
+      buffer = new StorageProxy('buffer');
     };
 
     selectContainer.ondblclick = () => {
@@ -60,33 +60,20 @@
       if (buffer.url) window.open(buffer.url);
     };
 
+    // select buffered entry on storage
+    window.onstorage = (event) => {
+      if (event.key !== 'buffer') return;
+
+      buffer = new StorageProxy('buffer');
+      selector.value = buffer.id;
+    };
+
     // keybindings
     selectContainer.addEventListener('keydown', event => {
       if (event.key === 'Delete') {
         buttons.DELETE.dispatchEvent(new PointerEvent('click'));
       }
     });
-
-    // button handlers
-    buttons.DELETE.onclick = async () => {
-      if (!confirm(`confirm DELETE ${buffer.id}`)) return;
-      const endpoint = `${env.API_SERVER}${env.ENTRIES_ENDPOINT}/${buffer.id}`;
-
-      try {
-        const res = await fetch(endpoint, { method: 'DELETE' });
-
-        const statusMessage = `${res.status} ${res.statusText}`;
-        if (res.status >= 400) throw new Error(statusMessage);
-
-        await idb.app.delete('entries', buffer.id);
-        selector.querySelector(`option#${buffer.id}`).remove();
-        
-        buffer = {};
-        localStorage.removeItem('buffer');
-      } catch (err) {
-        alert(err);
-      }
-    };
 
     // file upload
     buttons.upload.onchange = function (event) {
@@ -118,8 +105,8 @@
 
         buttons.upload.hidden = true;
         buttons.close.hidden = false;
-        buttons.DELETE.disabled = true;
-        buttons.close.value = `close file (${file.name})`;
+        window.parent.document.getElementById('buttons').DELETE.disabled = true;
+        buttons.close.textContent = `close file (${file.name})`;
 
         buttons.close.addEventListener('click', function handler() {
           uploadSelector.replaceWith(selector);
@@ -128,7 +115,7 @@
           buttons.upload.value = '';
           buttons.upload.hidden = false;
           buttons.close.hidden = true;
-          buttons.DELETE.disabled = false;
+          window.parent.document.getElementById('buttons').DELETE.disabled = false;
 
           buttons.close.removeEventListener('click', handler);
         });

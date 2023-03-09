@@ -11,25 +11,6 @@
      *  @borrows METADATA_ENDPOINT
      */
     window.env = JSON.parse(localStorage.getItem('env'));
-    window.buffer = fromStorage('buffer');
-
-    function fromStorage(itemKey) {
-      let model = JSON.parse(localStorage.getItem(itemKey)) || {};
-
-      return new Proxy(model, {
-        set(target, property, value) {
-          Reflect.set(target, property, value);
-          localStorage.setItem(itemKey, JSON.stringify(target));
-        },
-
-        deleteProperty(target, property) {
-          console.log({ property, type: typeof property });
-          if (typeof property === Array) { console.log('delete array requested'); }
-          Reflect.deleteProperty(target, property);
-          localStorage.setItem(itemKey, JSON.stringify(target));
-        }
-      });
-    }
   </script>
 </head>
 
@@ -39,15 +20,18 @@
   </div>
 
   <form id="buttons" class="buttons-container">
-    <input type="button" name="metadata" value="fetch metadata">
-    <input type="button" name="clear-textarea" value="clear textarea">
+    <button type="button" name="metadata">fetch metadata</button>
+    <button type="button" name="clear-textarea">clear textarea</button>
     <br>
-    <input type="button" name="reset" value="reset">
-    <input type="button" name="revert" value="revert">
-    <input type="button" name="save" value="save">
+    <button type="button" name="reset">reset</button>
+    <button type="button" name="revert">revert</button>
+    <button type="button" name="stage">stage</button>
   </form>
 
   <script type="module">
+    import StorageProxy from '/scripts/storage-proxy.js';
+    window.buffer = new StorageProxy('buffer');
+
     const formContainer = document.getElementById('form-container');
     const visualeditor = document.getElementById('visualeditor');
 
@@ -133,7 +117,9 @@
         visualeditor['accessed?'].checked = true;
         visualeditor.accessed.disabled = false;
       }
-      return rest;
+      if ('online' in buffer) {
+        visualeditor.online.checked = true;
+      }
     };
 
     visualeditor.reset();
@@ -142,7 +128,7 @@
     window.onstorage = (event) => {
       if (event.key !== 'buffer') return;
 
-      buffer = fromStorage('buffer');
+      buffer = new StorageProxy('buffer');
 
       visualeditor.reset();
       setTimeout(() => visualeditor.revert(buffer));
@@ -162,6 +148,9 @@
             case Object:
               Object.assign(model, JSON.parse(value));
               break;
+            case Boolean:
+              model[key] = true;
+              break;
             case undefined:
               break;
             default:
@@ -174,14 +163,14 @@
       }, {});
 
       localStorage.setItem('buffer', JSON.stringify(formModel));
-      buffer = fromStorage('buffer');
+      buffer = new StorageProxy('buffer');
     };
 
-    buttons.save.onclick = () => visualeditor.save();
+    buttons.stage.onclick = () => visualeditor.save();
 
     window.addEventListener('keydown', event => {
       if (event.key === 'Enter' && event.ctrlKey) {
-        buttons.save.dispatchEvent(new PointerEvent('click'));
+        buttons.stage.dispatchEvent(new PointerEvent('click'));
       }
     });
 
@@ -216,16 +205,16 @@
 
     buttons['clear-textarea'].onclick = () => {
       visualeditor.rest.value = '{}';
-    }
+    };
 
     buttons.metadata.onclick = async () => {
       const endpoint = env.API_SERVER + env.METADATA_ENDPOINT;
       const metadata = await fetchMetadata(endpoint, visualeditor.url.value);
-      
+
       console.log(metadata);
 
       localStorage.setItem('buffer', JSON.stringify(metadata));
-      buffer = fromStorage('buffer');
+      buffer = new StorageProxy('buffer');
       visualeditor.revert(buffer);
 
       async function fetchMetadata(endpoint, url) {
@@ -238,6 +227,18 @@
 
           const metadata = await res.json();
           metadata.online = true;
+
+          const keyNameMap = {
+            provider: 'publisher',
+            published: 'issued',
+          };
+
+          Object.keys(keyNameMap).forEach(key => {
+            if (key in metadata) {
+              metadata[keyNameMap[key]] = metadata[key];
+              delete metadata[key];
+            }
+          });
 
           return metadata;
         } catch (err) {

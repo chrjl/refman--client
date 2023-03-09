@@ -23,26 +23,9 @@
     };
 
     window.env = setEnvFromMeta();
+
     localStorage.setItem('env', JSON.stringify(env));
-  </script>
-
-  <script type="module"> // open connection to indexedDB and set handlers
-    import idb from '/scripts/idb.js';
-
-    buttons['clear-DB'].onclick = () => idb.app.clear('entries');
-
-    buttons['refresh-DB'].onclick = async () => {
-      const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
-      const res = await fetch(endpoint);
-      const data = await res.json();
-
-      const tx = idb.app.transaction('entries', 'readwrite');
-      await Promise.all([
-        tx.store.clear(),
-        ...data.map((entry) => tx.store.put(entry)),
-        tx.done,
-      ]);
-    };
+    localStorage.removeItem('buffer');
   </script>
 </head>
 
@@ -50,88 +33,43 @@
   <h1>welcome</h1>
 
   <div id="collection" class="widgets-container">
-    <iframe id="selector" name="selector" src="/widgets/selector/selector.html"></iframe>
-    <iframe id="visualeditor" name="visualeditor" src="/widgets/visualeditor/visualeditor.html"></iframe>
-    <iframe id="texteditor" name="texteditor" src="/widgets/texteditor/texteditor.html"></iframe>
-
-    <form id="buttons">
-      <fieldset>
-        <legend>control</legend>
-        <input type="button" name="clear-storage" value="localStorage.clear()">
-      </fieldset>
-
-      <fieldset>
-        <legend>indexedDB</legend>
-        <legend style="text-align:center;">entries</legend>
-        <input type="button" name="clear-DB" value="clear object store">
-        <input type="button" name="refresh-DB" value="fetch from server">
-      </fieldset>
-
-      <fieldset>
-        <legend>displays</legend>
-        <input type="button" name="html-table" value="HTML table">
-      </fieldset>
-
-      <fieldset>
-        <legend>downloads</legend>
-
-        <input type="button" name="download-json" value="json">
-        <input type="button" name="download-archive" value="archive">
-        <input type="button" name="download-biblatex" value="BibLaTeX">
-      </fieldset>
-    </form>
+    <iframe id="selector" name="selector" src="/components/frames/selector.html"></iframe>
+    <iframe id="visualeditor" name="visualeditor" src="/components/frames/visualeditor.html"></iframe>
+    <iframe id="texteditor" name="texteditor" src="/components/frames/texteditor.html"></iframe>
   </div>
+
+  <form id="buttons" class="buttons" style="display:inline-block">
+    <fieldset id="server-interface">
+      <legend>server</legend>
+    </fieldset>
+
+    <fieldset id="storage-interface">
+      <legend>application</legend>
+    </fieldset>
+
+    <fieldset id="views">
+      <legend>views</legend>
+    </fieldset>
+  </form>
 </body>
 
-<script type="module">
-  // button handlers
-  import handlers from '/scripts/handlers.js';
+<script type="module"> // buttons
+  import idb from '/scripts/idb.js';
+  import ServerAPI from '/components/buttons/server-api.mjs';
+  import StorageInterface from '/components/buttons/storage-interface.mjs';
+  import Views from '/components/buttons/views.mjs';
 
-  buttons['html-table'].addEventListener('click', () => {
-    window.open('/views/table-view.html');
-  });
+  document.getElementById('server-interface')
+    .append(new ServerAPI({ endpoint: `${env.API_SERVER}${env.ENTRIES_ENDPOINT}` }));
 
-  buttons['clear-storage'].addEventListener('click', () => localStorage.clear());
+  document.getElementById('storage-interface')
+    .append(new StorageInterface({ endpoint: `${env.API_SERVER}${env.JSON_DUMP_ENDPOINT}` }));
 
-  buttons['download-archive'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.ARCHIVE_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const blob = await response.blob();
+  // reload selector after fetching entries to idb
+  document.querySelector('iframe#selector').src += '';
 
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.tgz'
-    });
-  });
-
-  buttons['download-json'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const blob = await response.blob();
-
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.json'
-    });
-
-  });
-
-  buttons['download-biblatex'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const model = await response.json();
-
-    // const { default: generateBib } = await import('/scripts/generate-biblatex.js');
-    const blob = new Blob([handlers.generateBib(model)], { type: 'text/x-bibtex' });
-
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.bib'
-    });
-  });
+  document.getElementById('views')
+    .append(new Views());
 </script>
 
 </html>
