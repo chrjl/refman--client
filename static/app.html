@@ -5,24 +5,54 @@
   <link rel="stylesheet" href="/styles/frames.css">
   <link rel="stylesheet" href="/styles/styles.css">
 
-  <meta property="API_SERVER" value="/api">
-  <meta property="ENTRIES_ENDPOINT" value="/entries">
-  <meta property="JSON_DUMP_ENDPOINT" value="/entries/DUMP">
-  <meta property="METADATA_ENDPOINT" value="/metadata">
-  <meta property="ARCHIVE_ENDPOINT" value="/archives/generate">
-  <meta property="BIBLATEX_ENDPOINT" value="/archives/generate-biblatex">
+  <!-- <meta property="API_SERVER" value="[window.location.origin]"> -->
+  <meta property="ENDPOINT_ENTRIES" value="/api/entries">
+  <meta property="ENDPOINT_JSON_DUMP" value="/api/entries/DUMP">
+  <meta property="ENDPOINT_METADATA" value="/api/metadata">
+  <meta property="ENDPOINT_ARCHIVE" value="/api/archives/generate">
+  <meta property="ENDPOINT_BIBLATEX" value="/api/archives/generate-biblatex">
 
   <script>
-    const setEnvFromMeta = function () {
+    const readMetaProperties = function () {
       const properties = document.head.querySelectorAll('meta[property]');
+      const meta = {};
 
-      return [...properties].reduce((obj, elem) => ({
-        ...obj,
-        [elem.getAttribute('property')]: elem.getAttribute('value'),
-      }), {});
+      properties.forEach(elem => {
+        meta[elem.getAttribute('property')] = elem.getAttribute('value');
+      })
+      
+      return meta;
     };
+    
+    const generateEnv = function(meta) {
+      const env = {
+        endpoint: {}
+      }
 
-    window.env = setEnvFromMeta();
+      try {
+        const apiServerURL = new URL(meta.API_SERVER);
+        env.API_SERVER = meta.API_SERVER;
+
+        Object.entries(meta).forEach(([key, value]) => {
+          if (key.startsWith('ENDPOINT_')) {
+            env.endpoint[key.slice(9)] = new URL(value, env.API_SERVER);
+          }
+        })
+      } catch (err) {
+        if (!(err instanceof TypeError)) throw err;
+        
+        Object.entries(meta).forEach(([key, value]) => {
+          if (key.startsWith('ENDPOINT_')) {
+            env.endpoint[key.slice(9)] = value;
+          }
+        })
+      }
+      
+      return env;
+    }
+    
+    window.meta = readMetaProperties();
+    window.env = generateEnv(meta);
 
     localStorage.setItem('env', JSON.stringify(env));
     localStorage.removeItem('buffer');
@@ -60,13 +90,14 @@
   import Views from '/components/buttons/views.mjs';
 
   document.getElementById('server-interface')
-    .append(new ServerAPI({ endpoint: `${env.API_SERVER}${env.ENTRIES_ENDPOINT}` }));
+    .append(new ServerAPI({ endpoint: `${env.endpoint.ENTRIES}` }));
 
   document.getElementById('storage-interface')
-    .append(new StorageInterface({ endpoint: `${env.API_SERVER}${env.JSON_DUMP_ENDPOINT}` }));
+    .append(new StorageInterface({ endpoint: `${env.endpoint.JSON_DUMP}` }));
 
-  // reload selector after fetching entries to idb
-  document.querySelector('iframe#selector').src += '';
+  // fetch entries to idb, then reload selector
+  StorageInterface.syncDB(`${env.endpoint.JSON_DUMP}`)
+    .then(() => document.querySelector('iframe#selector').src += '');
 
   document.getElementById('views')
     .append(new Views());

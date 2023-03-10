@@ -208,7 +208,7 @@
     };
 
     buttons.metadata.onclick = async () => {
-      const endpoint = env.API_SERVER + env.METADATA_ENDPOINT;
+      const endpoint = env.endpoints.METADATA;
       const metadata = await fetchMetadata(endpoint, visualeditor.url.value);
 
       console.log(metadata);
