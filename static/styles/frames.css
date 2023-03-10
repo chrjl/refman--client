@@ -17,7 +17,3 @@ div.widgets-container {
 .widgets-container iframe#texteditor {
   width: 609px;
 }
-
-.widgets-container #buttons {
-  text-align: right;
-}

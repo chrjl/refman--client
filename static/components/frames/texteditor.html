@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <link rel="stylesheet" href="/styles/widgets.css">
+</head>
+
+<body class="widget">
+  <div id="textarea-container" class="content-container">
+    <textarea id="texteditor" wrap="off"></textarea>
+  </div>
+  <form id="buttons" class="buttons-container">
+    <br>
+    <button type="button" name="clear">clear</button>
+    <button type="button" name="revert">revert</button>
+    <button type="button" name="stage">stage</button>
+  </form>
+
+  <script type="module">
+    import idb from '/scripts/idb.js';
+    import StorageProxy from '/scripts/storage-proxy.js';
+
+    window.buffer = new StorageProxy('buffer');
+    window.entries = await idb.app.getAll('entries');
+
+    const textareaContainer = document.getElementById('textarea-container');
+    const texteditor = document.getElementById('texteditor');
+
+    // pull buffered entry/update on storage
+    window.onstorage = (event) => {
+      if (event.key !== 'buffer') return;
+
+      buffer = new StorageProxy('buffer');
+      texteditor.value = JSON.stringify(buffer, null, 2);
+    };
+
+    buttons.revert.onclick = () => {
+      try {
+        buffer = JSON.parse(localStorage.getItem('buffer'));
+      } catch (err) {
+        buffer = {};
+      }
+
+      texteditor.value = JSON.stringify(buffer, null, 2);
+    };
+
+    // push update to buffer
+    const setBuffer = function () {
+      try {
+        buffer = JSON.parse(texteditor.value || {});
+      } catch (err) {
+        if (err instanceof SyntaxError) {
+          alert('invalid JSON in textarea');
+          return;
+        }
+
+        throw err;
+      }
+
+      localStorage.setItem('buffer', JSON.stringify(buffer));
+    };
+
+    buttons.stage.onclick = setBuffer;
+
+    window.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && event.ctrlKey) {
+        buttons.stage.dispatchEvent(new PointerEvent('click'));
+      }
+    });
+
+    // button handlers
+    buttons.clear.onclick = () => {
+      texteditor.value = '';
+    };
+  </script>
+</body>
+
+</html>
