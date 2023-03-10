@@ -4,21 +4,10 @@
 
 <head>
   <link rel="stylesheet" href="/styles/styles.css">
-  <script>
-    /** @global retrieves env from localStorage (set by caller)
-     *  @borrows API_SERVER
-     *  @borrows JSON_DUMP_ENDPOINT
-     */
-    window.env = JSON.parse(localStorage.getItem('env'));
-  </script>
 
   <script type="module">
-    const endpoint = env.API_SERVER + env.JSON_DUMP_ENDPOINT;
-
-    const response = await fetch(endpoint);
-    if (response.status >= 400) throw new Error(`${response.status} ${response.message}`);
-
-    const data = await response.json();
+    import idb from '/scripts/idb.js'
+    const data = await idb.app.getAll('entries');
 
     const trFrom = function (cells) {
       const tr = document.createElement('tr');

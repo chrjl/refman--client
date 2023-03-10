@@ -5,25 +5,57 @@
   <link rel="stylesheet" href="/styles/frames.css">
   <link rel="stylesheet" href="/styles/styles.css">
 
-  <meta property="API_SERVER" value="/api">
-  <meta property="ENTRIES_ENDPOINT" value="/entries">
-  <meta property="JSON_DUMP_ENDPOINT" value="/entries/DUMP">
-  <meta property="METADATA_ENDPOINT" value="/metadata">
-  <meta property="ARCHIVE_ENDPOINT" value="/archives/generate">
-  <meta property="BIBLATEX_ENDPOINT" value="/archives/generate-biblatex">
+  <!-- <meta property="API_SERVER" value="[window.location.origin]"> -->
+  <meta property="ENDPOINT_ENTRIES" value="/api/entries">
+  <meta property="ENDPOINT_JSON_DUMP" value="/api/entries/DUMP">
+  <meta property="ENDPOINT_METADATA" value="/api/metadata">
+  <meta property="ENDPOINT_ARCHIVE" value="/api/archives/generate">
+  <meta property="ENDPOINT_BIBLATEX" value="/api/archives/generate-biblatex">
 
   <script>
-    const getEnvFromMeta = function () {
+    const readMetaProperties = function () {
       const properties = document.head.querySelectorAll('meta[property]');
+      const meta = {};
 
-      return [...properties].reduce((obj, elem) => ({
-        ...obj,
-        [elem.getAttribute('property')]: elem.getAttribute('value'),
-      }), {});
+      properties.forEach(elem => {
+        meta[elem.getAttribute('property')] = elem.getAttribute('value');
+      })
+      
+      return meta;
     };
+    
+    const generateEnv = function(meta) {
+      const env = {
+        endpoint: {}
+      }
 
-    localStorage.setItem('env', JSON.stringify(getEnvFromMeta()));
-    window.env = getEnvFromMeta();
+      try {
+        const apiServerURL = new URL(meta.API_SERVER);
+        env.API_SERVER = meta.API_SERVER;
+
+        Object.entries(meta).forEach(([key, value]) => {
+          if (key.startsWith('ENDPOINT_')) {
+            env.endpoint[key.slice(9)] = new URL(value, env.API_SERVER);
+          }
+        })
+      } catch (err) {
+        if (!(err instanceof TypeError)) throw err;
+        
+        Object.entries(meta).forEach(([key, value]) => {
+          if (key.startsWith('ENDPOINT_')) {
+            env.endpoint[key.slice(9)] = value;
+          }
+        })
+      }
+      
+      return env;
+    }
+    
+    window.meta = readMetaProperties();
+    window.env = generateEnv(meta);
+
+    localStorage.setItem('env', JSON.stringify(env));
+    localStorage.removeItem('buffer');
   </script>
 </head>
 
@@ -31,81 +63,44 @@
   <h1>welcome</h1>
 
   <div id="collection" class="widgets-container">
-    <iframe id="selector" name="selector" src="/widgets/selector/selector.html"></iframe>
-    <iframe id="visualeditor" name="visualeditor" src="/widgets/visualeditor/visualeditor.html"></iframe>
-    <iframe id="texteditor" name="texteditor" src="/widgets/texteditor/texteditor.html"></iframe>
-
-    <form id="buttons">
-      <fieldset>
-        <legend>control</legend>
-        <input type="button" name="clear-storage" value="localStorage.clear()">
-      </fieldset>
-
-      <fieldset>
-        <legend>displays</legend>
-        <input type="button" name="html-table" value="HTML table">
-      </fieldset>
-
-      <fieldset>
-        <legend>downloads</legend>
-
-        <input type="button" name="download-json" value="json">
-        <input type="button" name="download-archive" value="archive">
-        <input type="button" name="download-biblatex" value="BibLaTeX">
-      </fieldset>
-    </form>
+    <iframe id="selector" name="selector" src="/components/frames/selector.html"></iframe>
+    <iframe id="visualeditor" name="visualeditor" src="/components/frames/visualeditor.html"></iframe>
+    <iframe id="texteditor" name="texteditor" src="/components/frames/texteditor.html"></iframe>
   </div>
+
+  <form id="buttons" class="buttons" style="display:inline-block">
+    <fieldset id="server-interface">
+      <legend>server</legend>
+    </fieldset>
+
+    <fieldset id="storage-interface">
+      <legend>application</legend>
+    </fieldset>
+
+    <fieldset id="views">
+      <legend>views</legend>
+    </fieldset>
+  </form>
 </body>
 
-<script type="module">
-  // button handlers
-  import handlers from '/scripts/handlers.js';
+<script type="module"> // buttons
+  import idb from '/scripts/idb.js';
+  import ServerAPI from '/components/buttons/server-api.mjs';
+  import StorageInterface from '/components/buttons/storage-interface.mjs';
+  import Views from '/components/buttons/views.mjs';
 
-  buttons['html-table'].addEventListener('click', () => {
-    window.open('/views/table-view.html');
-  });
+  document.getElementById('server-interface')
+    .append(new ServerAPI({ endpoint: `${env.endpoint.ENTRIES}` }));
 
-  buttons['clear-storage'].addEventListener('click', () => localStorage.clear());
+  document.getElementById('storage-interface')
+    .append(new StorageInterface({ endpoint: `${env.endpoint.JSON_DUMP}` }));
 
-  buttons['download-archive'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.ARCHIVE_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const blob = await response.blob();
+  // fetch entries to idb, then reload selector
+  StorageInterface.syncDB(`${env.endpoint.JSON_DUMP}`)
+    .then(() => document.querySelector('iframe#selector').src += '');
 
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.tgz'
-    });
-  });
-
-  buttons['download-json'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const blob = await response.blob();
-
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.json'
-    });
-
-  });
-
-  buttons['download-biblatex'].addEventListener('click', async () => {
-    const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
-    const filetype = response.headers.get('content-type');
-    const model = await response.json();
-
-    // const { default: generateBib } = await import('/scripts/generate-biblatex.js');
-    const blob = new Blob([handlers.generateBib(model)], { type: 'text/x-bibtex' });
-
-    handlers.download({
-      blob,
-      basename: `db_${new Date().toISOString()}`,
-      extname: '.bib'
-    });
-  });
+  document.getElementById('views')
+    .append(new Views());
 </script>
 
 </html>
