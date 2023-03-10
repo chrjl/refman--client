@@ -11,23 +11,40 @@
   margin: 8px;
 }
 
-.widget select, .widget textarea, .widget form {
+.widget select,
+.widget textarea,
+.widget form {
   width: 100%;
   box-sizing: border-box;
 }
 
-/* CSL form widget */
+.content-container select,
+.content-container textarea {
+  height: 100%;
+}
 
-.widget span.label-title {
+/* visualeditor form widget */
+
+#visualeditor textarea {
+  display: block;
+  box-sizing: content-box;
+  width: 250px;
+}
+
+.content-container {
+  overflow-y: auto;
+}
+
+.content-container label {
   display: block;
 }
 
-.widget label {
+.content-container input[type]:not([type='checkbox']) {
+  margin-bottom: 10px;
   display: block;
-  margin: 10px auto;
 }
 
-.widget input[type="text"] {
+.content-container input[type='text'] {
   width: 250px;
 }
 
@@ -36,7 +53,7 @@ div#book-fields {
   margin-top: 10px;
 }
 
-div#book-fields input[type="text"] {
+div#book-fields input[type='text'] {
   width: 190px;
 }
 
