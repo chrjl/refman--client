@@ -66,7 +66,9 @@ export default class extends DocumentFragment {
     async json() {
       const { env } = this;
 
-      const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
+      const response = await fetch(env.endpoint.JSON_DUMP);
+      if (response.status >= 400) throw new Error('404');
+
       const filetype = response.headers.get('content-type');
       const blob = await response.blob();
 
@@ -80,7 +82,9 @@ export default class extends DocumentFragment {
     async archive() {
       const { env } = this;
 
-      const response = await fetch(env.API_SERVER + env.ARCHIVE_ENDPOINT);
+      const response = await fetch(env.endpoint.ARCHIVE);
+      if (response.status >= 400) throw new Error('404');
+
       const filetype = response.headers.get('content-type');
       const blob = await response.blob();
 
@@ -94,7 +98,9 @@ export default class extends DocumentFragment {
     async biblatex() {
       const { env } = this;
 
-      const response = await fetch(env.API_SERVER + env.JSON_DUMP_ENDPOINT);
+      const response = await fetch(env.endpoint.JSON_DUMP);
+      if (response.status >= 400) throw new Error('404');
+
       const filetype = response.headers.get('content-type');
       const model = await response.json();
 
